@@ -1,0 +1,59 @@
+name: Build unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-unsigned-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Check out iOS source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build for physical iPhones and iPads
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          plutil -lint LeqingMahjong/Info.plist
+          xcodebuild \
+            -project LeqingMahjong.xcodeproj \
+            -target LeqingMahjong \
+            -configuration Release \
+            -sdk iphoneos \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
+            SYMROOT="$RUNNER_TEMP/ios-build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package and verify unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/ios-build/Release-iphoneos/LeqingMahjong.app"
+          test -f "$APP/LeqingMahjong"
+          xcrun lipo -verify_arch arm64 "$APP/LeqingMahjong"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload" "$GITHUB_WORKSPACE/artifacts"
+          ditto "$APP" "$RUNNER_TEMP/ipa/Payload/LeqingMahjong.app"
+          ditto -c -k --keepParent "$RUNNER_TEMP/ipa/Payload" "$GITHUB_WORKSPACE/artifacts/LeqingMahjong-1.0-unsigned.ipa"
+          unzip -t "$GITHUB_WORKSPACE/artifacts/LeqingMahjong-1.0-unsigned.ipa"
+          shasum -a 256 "$GITHUB_WORKSPACE/artifacts/LeqingMahjong-1.0-unsigned.ipa"
+      - name: Save IPA for local signing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: LeqingMahjong-unsigned-IPA
+          path: artifacts/LeqingMahjong-1.0-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 1
