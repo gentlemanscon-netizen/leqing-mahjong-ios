@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           APP="$RUNNER_TEMP/ios-build/Release-iphoneos/LeqingMahjong.app"
           test -f "$APP/LeqingMahjong"
-          xcrun lipo -verify_arch arm64 "$APP/LeqingMahjong"
+          xcrun lipo "$APP/LeqingMahjong" -verify_arch arm64
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload" "$GITHUB_WORKSPACE/artifacts"
           ditto "$APP" "$RUNNER_TEMP/ipa/Payload/LeqingMahjong.app"
